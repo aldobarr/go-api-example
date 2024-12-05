@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"math"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -35,24 +36,62 @@ func ValidatePurchaseTime(fl validator.FieldLevel) bool {
 	return err == nil
 }
 
+func ParseFloat(s any) float64 {
+	switch v := s.(type) {
+	case string:
+		f, err := strconv.ParseFloat(v, 64)
+		if err != nil {
+			return 0.0
+		}
+
+		return f
+	case float64:
+		return v
+	case float32:
+	case int:
+		return float64(v)
+	}
+
+	return 0.0
+}
+
 func ProcessReceipt(c *fiber.Ctx) error {
-	receipt := new(Receipt)
-	err := c.BodyParser(receipt)
+	rawreceipt := new(ReceiptRaw)
+	err := c.BodyParser(rawreceipt)
 	if err != nil {
 		return HandleError(err, c, fiber.StatusBadRequest)
 	}
 
-	verr := ValidateInput(receipt)
+	verr := ValidateInput(rawreceipt)
 	if verr != nil {
 		return HandleError(verr, c, fiber.StatusUnprocessableEntity)
 	}
 
-	purchaseDateTime, err := time.Parse(fmt.Sprintf("%s %s", time.DateOnly, "15:04"), fmt.Sprintf("%s %s", receipt.PurchaseDate, receipt.PurchaseTime))
+	purchaseDateTime, err := time.Parse(fmt.Sprintf("%s %s", time.DateOnly, "15:04"), fmt.Sprintf("%s %s", rawreceipt.PurchaseDate, rawreceipt.PurchaseTime))
 	if err != nil {
 		return HandleError(err, c, fiber.StatusUnprocessableEntity)
 	}
 
-	receipt.Points = 0
+	receipt := Receipt{
+		Retailer:     rawreceipt.Retailer,
+		PurchaseDate: rawreceipt.PurchaseDate,
+		PurchaseTime: rawreceipt.PurchaseTime,
+		Total:        ParseFloat(rawreceipt.Total),
+		Items:        make([]Item, len(rawreceipt.Items)),
+		Points:       0,
+	}
+
+	for i, item := range rawreceipt.Items {
+		price := ParseFloat(item.Price)
+		descLength := len(strings.TrimSpace(item.ShortDescription))
+		if math.Mod(float64(descLength), 3) == 0 {
+			receipt.Points += int(math.Ceil(price * 0.2))
+		}
+
+		receipt.Items[i].Price = price
+		receipt.Items[i].ShortDescription = item.ShortDescription
+	}
+
 	alphaNumRetailer := regexp.MustCompile(`[^\p{L}\p{N}]+`).ReplaceAllString(receipt.Retailer, "")
 	receipt.Points += len(alphaNumRetailer)
 
@@ -67,13 +106,6 @@ func ProcessReceipt(c *fiber.Ctx) error {
 	itemCount := len(receipt.Items)
 	itemPointsMultiple := int(math.Floor(float64(itemCount) / 2.0))
 	receipt.Points += 5 * itemPointsMultiple
-
-	for _, item := range receipt.Items {
-		descLength := len(strings.TrimSpace(item.ShortDescription))
-		if math.Mod(float64(descLength), 3) == 0 {
-			receipt.Points += int(math.Ceil(item.Price * 0.2))
-		}
-	}
 
 	if math.Mod(float64(purchaseDateTime.Day()), 2) != 0 {
 		receipt.Points += 6
