@@ -2,6 +2,9 @@ package handlers
 
 import (
 	"fmt"
+	"math"
+	"regexp"
+	"strings"
 	"time"
 
 	"github.com/aldobarr/go-api-example/api/database"
@@ -42,7 +45,42 @@ func ProcessReceipt(c *fiber.Ctx) error {
 		return HandleError(verr, c, fiber.StatusUnprocessableEntity)
 	}
 
+	purchaseDateTime, err := time.Parse(time.DateTime, fmt.Sprintf("%s %s", receipt.PurchaseDate, receipt.PurchaseTime))
+	if err != nil {
+		return HandleError(err, c, fiber.StatusUnprocessableEntity)
+	}
+
 	receipt.Points = 0
+	alphaNumRetailer := regexp.MustCompile(`[^\p{L}\p{N}]+`).ReplaceAllString(receipt.Retailer, "")
+	receipt.Points += len(alphaNumRetailer)
+
+	if receipt.Total == math.Floor(receipt.Total) {
+		receipt.Points += 50
+	}
+
+	if math.Mod(receipt.Total, 0.25) == 0 {
+		receipt.Points += 25
+	}
+
+	itemCount := len(receipt.Items)
+	itemPointsMultiple := int(math.Floor(float64(itemCount) / 2.0))
+	receipt.Points += 5 * itemPointsMultiple
+
+	for _, item := range receipt.Items {
+		descLength := len(strings.TrimSpace(item.ShortDescription))
+		if math.Mod(float64(descLength), 3) == 0 {
+			receipt.Points += int(math.Ceil(item.Price * 0.2))
+		}
+	}
+
+	if math.Mod(float64(purchaseDateTime.Day()), 2) != 0 {
+		receipt.Points += 6
+	}
+
+	// Requirements seem to specify between 2pm and 4pm exclusive.
+	if purchaseDateTime.Hour() >= 14 && purchaseDateTime.Hour() < 16 && (purchaseDateTime.Hour() != 14 || purchaseDateTime.Minute() != 0) {
+		receipt.Points += 10
+	}
 
 	id := ReceiptID{uuid.New().String()}
 
