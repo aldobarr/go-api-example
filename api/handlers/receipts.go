@@ -1,6 +1,8 @@
 package handlers
 
 import (
+	"bytes"
+	"encoding/gob"
 	"fmt"
 	"math"
 	"regexp"
@@ -45,7 +47,7 @@ func ProcessReceipt(c *fiber.Ctx) error {
 		return HandleError(verr, c, fiber.StatusUnprocessableEntity)
 	}
 
-	purchaseDateTime, err := time.Parse(time.DateTime, fmt.Sprintf("%s %s", receipt.PurchaseDate, receipt.PurchaseTime))
+	purchaseDateTime, err := time.Parse(fmt.Sprintf("%s %s", time.DateOnly, "15:04"), fmt.Sprintf("%s %s", receipt.PurchaseDate, receipt.PurchaseTime))
 	if err != nil {
 		return HandleError(err, c, fiber.StatusUnprocessableEntity)
 	}
@@ -100,5 +102,14 @@ func GetPoints(c *fiber.Ctx) error {
 		return HandleError(fmt.Errorf("Receipt with ID %s not found", id), c, fiber.StatusNotFound)
 	}
 
-	return c.SendString(id)
+	data, err := database.Get(id)
+	if err != nil {
+		return HandleError(err, c, fiber.StatusInternalServerError)
+	}
+
+	receipt := new(Receipt)
+	dec := gob.NewDecoder(bytes.NewReader(data))
+	dec.Decode(receipt)
+
+	return c.JSON(ReceiptPoints{receipt.Points})
 }

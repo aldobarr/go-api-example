@@ -4,6 +4,10 @@ type ReceiptID struct {
 	ID string `json:"id"`
 }
 
+type ReceiptPoints struct {
+	Points int `json:"points"`
+}
+
 type Receipt struct {
 	Retailer     string  `json:"retailer" validate:"required"`
 	PurchaseDate string  `json:"purchaseDate" validate:"required,purchaseDate"`
