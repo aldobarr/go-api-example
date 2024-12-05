@@ -37,6 +37,8 @@ func ValidatePurchaseTime(fl validator.FieldLevel) bool {
 }
 
 func ParseFloat(s any) float64 {
+	// In a real application the default 0.0 returns would also add error logging
+	// Although they should never occur due to the validator running beforehand.
 	switch v := s.(type) {
 	case string:
 		f, err := strconv.ParseFloat(v, 64)
