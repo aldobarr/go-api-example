@@ -34,11 +34,8 @@ The server will start on `http://localhost:8080`.
 
 ### API Endpoints
 
-- `GET /api/v1/resource` - Retrieve a list of resources
-- `POST /api/v1/resource` - Create a new resource
-- `GET /api/v1/resource/{id}` - Retrieve a specific resource by ID
-- `PUT /api/v1/resource/{id}` - Update a specific resource by ID
-- `DELETE /api/v1/resource/{id}` - Delete a specific resource by ID
+- `GET /receipts/{id}/points` - Retrieve the number of points earned for a receipt with the specified ID
+- `POST /receipts/process` - Create a new receipt and process points
 
 ### License
 
